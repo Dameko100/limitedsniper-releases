@@ -1,0 +1,26 @@
+# Posts each published release to Discord with its full changelog.
+# The release text goes through env vars, never into the script itself.
+name: Discord release notes
+on:
+  release:
+    types: [published]
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post the changelog to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          NAME: ${{ github.event.release.name || github.event.release.tag_name }}
+          BODY: ${{ github.event.release.body }}
+          URL: ${{ github.event.release.html_url }}
+        run: |
+          # Discord caps an embed description at 4096 characters.
+          jq -n --arg name "$NAME" --arg body "$BODY" --arg url "$URL" '{
+            allowed_mentions: { parse: [] },
+            embeds: [{
+              title: ("Limited Sniper " + $name), url: $url, color: 5793266,
+              description: (if ($body | length) > 4000 then $body[0:4000] + "…" else $body end),
+              footer: { text: "Download from the link above or the in-app Update button" }
+            }]
+          }' | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK"
