@@ -1,20 +1,34 @@
 # Posts each published release to Discord with its full changelog.
 # The release text goes through env vars, never into the script itself.
+# Run it by hand (Actions → Run workflow) to post an existing release as a demo.
 name: Discord release notes
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release to post (empty = latest)'
+        required: false
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
       - name: Post the changelog to Discord
         env:
+          GH_TOKEN: ${{ github.token }}
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TAG: ${{ inputs.tag }}
           NAME: ${{ github.event.release.name || github.event.release.tag_name }}
           BODY: ${{ github.event.release.body }}
           URL: ${{ github.event.release.html_url }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            R=$(gh release view ${TAG:+"$TAG"} --repo "$GITHUB_REPOSITORY" --json name,tagName,body,url)
+            NAME="$(jq -r 'if (.name // "") == "" then .tagName else .name end' <<<"$R") (demo)"
+            BODY=$(jq -r .body <<<"$R")
+            URL=$(jq -r .url <<<"$R")
+          fi
           # Discord caps an embed description at 4096 characters.
           jq -n --arg name "$NAME" --arg body "$BODY" --arg url "$URL" '{
             allowed_mentions: { parse: [] },
