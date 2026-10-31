@@ -1,6 +1,6 @@
 # Posts each published release to Discord with its full changelog.
 # The release text goes through env vars, never into the script itself.
-# Run it by hand (Actions → Run workflow) to post an existing release as a demo.
+# Run it by hand (Actions → Run workflow) to post an existing release again.
 name: Discord release notes
 on:
   release:
@@ -25,7 +25,7 @@ jobs:
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             R=$(gh release view ${TAG:+"$TAG"} --repo "$GITHUB_REPOSITORY" --json name,tagName,body,url)
-            NAME="$(jq -r 'if (.name // "") == "" then .tagName else .name end' <<<"$R") (demo)"
+            NAME="$(jq -r 'if (.name // "") == "" then .tagName else .name end' <<<"$R")"
             BODY=$(jq -r .body <<<"$R")
             URL=$(jq -r .url <<<"$R")
           fi
