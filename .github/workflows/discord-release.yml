@@ -29,12 +29,16 @@ jobs:
             BODY=$(jq -r .body <<<"$R")
             URL=$(jq -r .url <<<"$R")
           fi
-          # Discord caps an embed description at 4096 characters.
-          jq -n --arg name "$NAME" --arg body "$BODY" --arg url "$URL" '{
-            allowed_mentions: { parse: [] },
-            embeds: [{
-              title: ("Limited Sniper " + $name), url: $url, color: 5793266,
-              description: (if ($body | length) > 4000 then $body[0:4000] + "…" else $body end),
-              footer: { text: "Download from the link above or the in-app Update button" }
-            }]
-          }' | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK"
+          # Discord caps an embed description at 4096 characters. It does not draw
+          # images inside the text, so the first markdown image becomes the embed
+          # image, and the title is not prefixed twice.
+          node -e '
+            const { NAME, BODY, URL } = process.env;
+            const img = /!\[[^\]]*\]\(([^)\s]+)\)/.exec(BODY)?.[1];
+            const text = BODY.replace(/!\[[^\]]*\]\([^)]*\)\s*/g, "");
+            const embed = { title: /^limited ?sniper/i.test(NAME) ? NAME : "Limited Sniper " + NAME, url: URL, color: 5793266,
+              description: text.length > 4000 ? text.slice(0, 4000) + "…" : text,
+              footer: { text: "Download from the link above or the in-app Update button" } };
+            if (img) embed.image = { url: img };
+            process.stdout.write(JSON.stringify({ allowed_mentions: { parse: [] }, embeds: [embed] }));
+          ' | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK"
